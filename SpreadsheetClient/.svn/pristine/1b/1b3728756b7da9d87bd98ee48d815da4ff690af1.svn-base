@@ -1,0 +1,365 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using SS;
+using System.Text.RegularExpressions;
+using SpreadsheetUtilities;
+using System.IO;
+using System.Diagnostics;
+
+namespace SpreadsheetGUI
+{
+    public partial class Form1 : Form
+    {
+        // This form contains a spreadsheet object and the current row and column
+        Spreadsheet ss;
+        int col, row;
+
+
+        /// <summary>
+        /// A constructor for the Form
+        /// </summary>
+        public Form1()
+        {
+            // Sets up the needed variables 
+            InitializeComponent();
+            ss = new Spreadsheet(validCell, normalCell);
+
+            ss.CellReceived += CellReceived;
+
+            col = 0;
+            row = 0;
+
+            // Every time the selection is changed, displaySelection is the method called
+            // (which takes in the spreadsheet panel)
+            spreadPanel.SelectionChanged += displaySelection;
+
+            // Sets the default selections
+            spreadPanel.SetSelection(0, 0);
+            cellBox.Text = "A1";
+            contBox.Select();
+        }
+
+
+        /// <summary>
+        /// The method invoked when the user changes selections
+        /// </summary>
+        /// <param name="sp"></param>
+        private void displaySelection(SpreadsheetPanel sp)
+        {
+            // Saves the previous column and row
+            int oldCol = col;
+            int oldRow = row;
+
+            // Sets the column and row to the new selections
+            sp.GetSelection(out col, out row);
+
+            // Gets the previous cell name and the new cell name
+            String oldCellName = (char)(oldCol + 65) + "" + (oldRow + 1);
+            String newCellName = (char)(col + 65) + "" + (row + 1);
+
+            // If the content is a formula, the newly selected cell should not be selected.
+            // Rather, its name will be added to the current formula
+            if (contBox.Text.StartsWith("="))
+            {
+                contBox.Text += newCellName;
+                col = oldCol;
+                row = oldRow;
+                sp.SetSelection(col, row);
+                contBox.Select(contBox.Text.Length, 0);
+            }
+            else
+            {
+                setCell(oldCellName, contBox.Text);
+                setTextBoxes(sp);
+            }
+        }
+
+
+        /// <summary>
+        /// Whenever the user presses or holds a key, this is invoked.
+        /// </summary>
+        /// <param name="sender">The sender</param>
+        /// <param name="e">The key event arguments</param>
+        private void textBox1_KeyDown(object sender, KeyEventArgs e)
+        {
+            // If the key is enter, set the contents of the current cell
+            if (e.KeyCode == Keys.Enter)
+            {
+                String cellName = (char)(col + 65) + "" + (row + 1);
+                setCell(cellName, contBox.Text);
+
+                // Move down one cell if there is room
+                if (row < 98)
+                    spreadPanel.SetSelection(col, ++row);
+
+                // Reset the text boxes
+                setTextBoxes(spreadPanel);
+            }
+
+            // If the key is right set the contents of the current cell
+            if (e.KeyCode == Keys.Right)
+            {
+                String cellName = (char)(col + 65) + "" + (row + 1);
+                setCell(cellName, contBox.Text);
+
+                // Move right one cell if there is room
+                if(col < 25)
+                    spreadPanel.SetSelection(++col, row);
+
+                setTextBoxes(spreadPanel);
+            }
+
+            // If the key is left, set the contents of the current cell
+            if (e.KeyCode == Keys.Left)
+            {
+                String cellName = (char)(col + 65) + "" + (row + 1);
+                setCell(cellName, contBox.Text);
+
+                // Move left one cell if there is room
+                if(col > 0)
+                    spreadPanel.SetSelection(--col, row);
+
+                setTextBoxes(spreadPanel);
+            }
+
+            // If the key is up, set the contents of the current cell
+            if (e.KeyCode == Keys.Up)
+            {
+                String cellName = (char)(col + 65) + "" + (row + 1);
+                setCell(cellName, contBox.Text);
+
+                // Move up if there is room
+                if(row > 0)
+                    spreadPanel.SetSelection(col, --row);
+
+                setTextBoxes(spreadPanel);
+            }
+
+            // If the key is down, set the contents of the current cell
+            if (e.KeyCode == Keys.Down)
+            {
+                String cellName = (char)(col + 65) + "" + (row + 1);
+                setCell(cellName, contBox.Text);
+
+                // Move up if there is room
+                if(row < 98)
+                    spreadPanel.SetSelection(col, ++row);
+
+                setTextBoxes(spreadPanel);
+            }
+        }
+
+
+        /// <summary>
+        /// Creates a new spreadsheet in a new window
+        /// </summary>
+        /// <param name="sender">The sender</param>
+        /// <param name="e">The event arguments</param>
+        private void newSpreadsheetToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            DemoApplicationContext.getAppContext().RunForm(new Form1());
+        }
+
+
+        /// <summary>
+        /// Closes the current spreadsheet window
+        /// </summary>
+        /// <param name="sender">The sender</param>
+        /// <param name="e">The event arguments</param>
+        private void closeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // Closes the current window (the FormClosing event takes care of warning the user of data loss)
+            Close();
+        }
+
+
+        /// <summary>
+        /// Sets the specified contents to the specified cell
+        /// </summary>
+        /// <param name="cellName">Cell to set</param>
+        /// <param name="cellContent">Contents to set</param>
+        private void setCell(String cellName, String cellContent)
+        {
+            // Get the contents
+            String contents = ss.GetCellContents(cellName);
+
+            // Try setting the contents of the cell
+            if (!contents.Equals(cellContent))
+            {
+                // Get the current position
+                int cellCol = cellName[0] - 65;
+                double cellRow = 0;
+                Double.TryParse(cellName.Substring(1), out cellRow);
+                cellRow--;
+
+                try
+                {
+                    ss.SetContentsOfCell(cellName, cellContent);
+                }
+                catch (InvalidNameException)
+                {
+                    MessageBox.Show("You have entered an invalid cell name");
+                    contBox.Text = ss.GetCellContents(cellName);
+                }
+                catch (ArgumentNullException)
+                {
+                    MessageBox.Show("You cannot enter a null parameter");
+                    contBox.Text = ss.GetCellContents(cellName);
+                }
+                catch (FormulaFormatException e)
+                {
+                    MessageBox.Show(e.Message);
+                    contBox.Text = ss.GetCellContents(cellName);
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show("An error occured: " + e.Message);
+                    contBox.Text = ss.GetCellContents(cellName);
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Sets the values of all text boxes
+        /// </summary>
+        /// <param name="sp"></param>
+        private void setTextBoxes(SpreadsheetPanel sp)
+        {
+            // Gets the value from the currently selected cell
+            String val;
+            sp.GetValue(col, row, out val);
+
+            // Gets the name of the cell and its contents
+            String name = (char)(col + 65) + "" + (row + 1);
+            String contents = ss.GetCellContents(name);
+
+            // Set the text in each textbox
+            contBox.Text = contents;
+            cellBox.Text = name;
+            valBox.Text = val;
+        }
+
+        private void CellReceived(String cellName, String cellContent)
+        {
+            // Get the current position
+            int cellCol = cellName[0] - 65;
+            double cellRow = 0;
+            Double.TryParse(cellName.Substring(1), out cellRow);
+            cellRow--;
+
+            // Set the value of the cell
+            spreadPanel.SetValue(cellCol, (int)cellRow, ss.GetCellValue(cellName));
+        }
+
+
+        /// <summary>
+        /// Displays the help text file
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void helpToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (File.Exists("help.txt"))
+            {
+                File.SetAttributes("help.txt", FileAttributes.Normal);
+            }
+            else
+            {
+                // Sets up the help file
+                using (File.Create("help.txt"))
+                {
+                }
+            }
+            using (TextWriter writer = new StreamWriter("help.txt"))
+            {
+                writer.WriteLine("How to use this spreadsheet");
+                writer.WriteLine("");
+                writer.WriteLine("Click on any cell to select that cell");
+                writer.WriteLine("");
+                writer.WriteLine("Any text entered into from the keyboard will be displayed in the contents box and in the selected cell");
+                writer.WriteLine("- The non-editable textbox by the cell label shows the name of the currently selected cell");
+                writer.WriteLine("- The non-editable textbox by the value label shows the value of the currently selected cell");
+                writer.WriteLine("");
+                writer.WriteLine("The text in the editable textbox will be effectively be set as the contents of the cell on any of the following actions:");
+                writer.WriteLine("- Pressing the 'Enter' button (after which the cell directly below the current cell will be selected)");
+                writer.WriteLine("- Pressing any arrow key (after which the next respective cell will be selected)");
+                writer.WriteLine("");
+                writer.WriteLine("Clicking on a new cell will have one of the following effects:");
+                writer.WriteLine("- If the content box contains a number or a string, the contents of the currently selected cell will be set");
+                writer.WriteLine("- If the content box contains a formula, the name of the newly selected cell will be added to the current formula (contents will not be set)");
+                writer.WriteLine("- Note: this means the only way to set contents after entering a formula are by pressing 'Enter' or an arrow key");
+                writer.WriteLine("");
+                writer.WriteLine("To save a spreadsheet, use File --> save, and type in the name of the spreadsheet");
+                writer.WriteLine("");
+                writer.WriteLine("To open a spreadsheet, use File --> open, and select the desired spreadsheet file");
+                writer.WriteLine("");
+                writer.WriteLine("To create a new spreadsheet, use File --> new");
+                writer.WriteLine("");
+                writer.WriteLine("To close the current spreadsheet, use File --> close");
+                writer.WriteLine("");
+                writer.WriteLine("To undo the last move, simply use Ctrl-Z (this is only allowed 20 times in a row)");
+            }
+
+            // Opens the help text file using the default program for the machine
+            var fileToOpen = "help.txt";
+            var process = new Process();
+            process.StartInfo = new ProcessStartInfo()
+            {
+                UseShellExecute = true,
+                FileName = fileToOpen
+            };
+
+            process.Start();
+            process.WaitForExit();
+        }
+
+        private void saveToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+        }
+
+        private void openToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+        }
+
+        private void undoCtrlZToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+        }
+
+        private void clearToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+        }
+
+
+        /// <summary>
+        /// A function for validating cell names
+        /// </summary>
+        /// <param name="s">The name to be validated</param>
+        /// <returns>True if the name is valid</returns>
+        private bool validCell(string s)
+        {
+            return Regex.IsMatch(s, @"^[a-zA-Z]{1}[1-9]{1}[0-9]?$");
+        }
+
+        /// <summary>
+        /// A function for normalizing cells
+        /// </summary>
+        /// <param name="s">The name to be normalized</param>
+        /// <returns>The normalized version of the name</returns>
+        private String normalCell(string s)
+        {
+            return s.ToUpper();
+        }
+    }
+}

@@ -1,0 +1,315 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Spreadsheet</name>
+    </assembly>
+    <members>
+        <member name="T:SS.InvalidNameException">
+            <summary>
+            Thrown to indicate that a name parameter was either null or invalid.
+            </summary>
+        </member>
+        <member name="T:SS.SpreadsheetReadWriteException">
+            <summary>
+            Thrown to indicate that a read or write attempt has failed.
+            </summary>
+        </member>
+        <member name="M:SS.SpreadsheetReadWriteException.#ctor(System.String)">
+            <summary>
+            Creates the exception with a message
+            </summary>
+        </member>
+        <member name="T:SS.AbstractSpreadsheet">
+            <summary>
+            An AbstractSpreadsheet object represents the state of a simple spreadsheet.  A 
+            spreadsheet consists of an infinite number of named cells.
+            
+            A string is a cell name if and only if it consists of one or more letters,
+            followed by one or more digits AND it satisfies the predicate IsValid.
+            For example, "A15", "a15", "XY032", and "BC7" are cell names so long as they
+            satisfy IsValid.  On the other hand, "Z", "X_", and "hello" are not cell names,
+            regardless of IsValid.
+            
+            Any valid incoming cell name, whether passed as a parameter or embedded in a formula,
+            must be normalized with the Normalize method before it is used by or saved in 
+            this spreadsheet.  For example, if Normalize is s => s.ToUpper(), then
+            the Formula "x3+a5" should be converted to "X3+A5" before use.
+            
+            A spreadsheet contains a cell corresponding to every possible cell name.  
+            In addition to a name, each cell has a contents and a value.  The distinction is
+            important.
+            
+            The contents of a cell can be (1) a string, (2) a double, or (3) a Formula.  If the
+            contents is an empty string, we say that the cell is empty.  (By analogy, the contents
+            of a cell in Excel is what is displayed on the editing line when the cell is selected.)
+            
+            In a new spreadsheet, the contents of every cell is the empty string.
+             
+            The value of a cell can be (1) a string, (2) a double, or (3) a FormulaError.  
+            (By analogy, the value of an Excel cell is what is displayed in that cell's position
+            in the grid.)
+            
+            If a cell's contents is a string, its value is that string.
+            
+            If a cell's contents is a double, its value is that double.
+            
+            If a cell's contents is a Formula, its value is either a double or a FormulaError,
+            as reported by the Evaluate method of the Formula class.  The value of a Formula,
+            of course, can depend on the values of variables.  The value of a variable is the 
+            value of the spreadsheet cell it names (if that cell's value is a double) or 
+            is undefined (otherwise).
+            
+            Spreadsheets are never allowed to contain a combination of Formulas that establish
+            a circular dependency.  A circular dependency exists when a cell depends on itself.
+            For example, suppose that A1 contains B1*2, B1 contains C1*2, and C1 contains A1*2.
+            A1 depends on B1, which depends on C1, which depends on A1.  That's a circular
+            dependency.
+            </summary>
+        </member>
+        <member name="M:SS.AbstractSpreadsheet.#ctor(System.Func{System.String,System.Boolean},System.Func{System.String,System.String})">
+            <summary>
+            Constructs an abstract spreadsheet by recording its variable validity test,
+            its normalization method, and its version information.  The variable validity
+            test is used throughout to determine whether a string that consists of one or
+            more letters followed by one or more digits is a valid cell name.  The variable
+            equality test should be used thoughout to determine whether two variables are
+            equal.
+            </summary>
+        </member>
+        <member name="M:SS.AbstractSpreadsheet.GetCellValue(System.String)">
+            <summary>
+            If name is null or invalid, throws an InvalidNameException.
+            
+            Otherwise, returns the value (as opposed to the contents) of the named cell.  The return
+            value should be either a string, a double, or a SpreadsheetUtilities.FormulaError.
+            </summary>
+        </member>
+        <member name="M:SS.AbstractSpreadsheet.GetCellContents(System.String)">
+            <summary>
+            If name is null or invalid, throws an InvalidNameException.
+            
+            Otherwise, returns the contents (as opposed to the value) of the named cell.  The return
+            value should be either a string, a double, or a Formula.
+            </summary>
+        </member>
+        <member name="M:SS.AbstractSpreadsheet.SetContentsOfCell(System.String,System.String)">
+            <summary>
+            If content is null, throws an ArgumentNullException.
+            
+            Otherwise, if name is null or invalid, throws an InvalidNameException.
+            
+            Otherwise, if content parses as a double, the contents of the named
+            cell becomes that double.
+            
+            Otherwise, if content begins with the character '=', an attempt is made
+            to parse the remainder of content into a Formula f using the Formula
+            constructor.  There are then three possibilities:
+            
+              (1) If the remainder of content cannot be parsed into a Formula, a 
+                  SpreadsheetUtilities.FormulaFormatException is thrown.
+                  
+              (2) Otherwise, if changing the contents of the named cell to be f
+                  would cause a circular dependency, a CircularException is thrown.
+                  
+              (3) Otherwise, the contents of the named cell becomes f.
+            
+            Otherwise, the contents of the named cell becomes content.
+            
+            If an exception is not thrown, the method returns a set consisting of
+            name plus the names of all other cells whose value depends, directly
+            or indirectly, on the named cell.
+            
+            For example, if name is A1, B1 contains A1*2, and C1 contains B1+A1, the
+            set {A1, B1, C1} is returned.
+            </summary>
+        </member>
+        <member name="P:SS.AbstractSpreadsheet.IsValid">
+            <summary>
+            Method used to determine whether a string that consists of one or more letters
+            followed by one or more digits is a valid variable name.
+            </summary>
+        </member>
+        <member name="P:SS.AbstractSpreadsheet.Normalize">
+            <summary>
+            Method used to convert a cell name to its standard form.  For example,
+            Normalize might convert names to upper case.
+            </summary>
+        </member>
+        <member name="T:SS.Cell">
+            <summary>
+            Represents a Cell object, to be used by the Spreadsheet class
+            </summary>
+        </member>
+        <member name="M:SS.Cell.setContents(System.String,System.String)">
+            <summary>
+            Sets the contents of this cell
+            </summary>
+            <param name="newContents">The object to set as the contents of the cell</param>
+        </member>
+        <member name="M:SS.Cell.getContents">
+            <summary>
+            Gets the contents of this cell
+            </summary>
+            <returns>The contents of the cell</returns>
+        </member>
+        <member name="M:SS.Cell.getValue">
+            <summary>
+            
+            </summary>
+            <returns>The value of the specified cell</returns>
+        </member>
+        <member name="T:SS.FormulaChecker">
+            <summary>
+            Represents formulas written in standard infix notation using standard precedence
+            rules.  The allowed symbols are non-negative numbers written using double-precision 
+            floating-point syntax; variables that consist of a letter or underscore followed by 
+            zero or more letters, underscores, or digits; parentheses; and the four operator 
+            symbols +, -, *, and /.
+            
+            Spaces are significant only insofar that they delimit tokens.  For example, "xy" is
+            a single variable, "x y" consists of two variables "x" and y; "x23" is a single variable; 
+            and "x 23" consists of a variable "x" and a number "23".
+            
+            Associated with every formula are two delegates:  a normalizer and a validator.  The
+            normalizer is used to convert variables into a canonical form, and the validator is used
+            to add extra restrictions on the validity of a variable (beyond the standard requirement 
+            that it consist of a letter or underscore followed by zero or more letters, underscores,
+            or digits.)  Their use is described in detail in the constructor and method comments.
+            </summary>
+        </member>
+        <member name="M:SS.FormulaChecker.check(System.String,System.Func{System.String,System.String},System.Func{System.String,System.Boolean})">
+            <summary>
+            Creates a Formula from a string that consists of an infix expression written as
+            described in the class comment.  If the expression is syntactically incorrect,
+            throws a FormulaFormatException with an explanatory Message.
+            
+            The associated normalizer and validator are the second and third parameters,
+            respectively.  
+            
+            If the formula contains a variable v such that normalize(v) is not a legal variable, 
+            throws a FormulaFormatException with an explanatory message. 
+            
+            If the formula contains a variable v such that isValid(normalize(v)) is false,
+            throws a FormulaFormatException with an explanatory message.
+            
+            Suppose that N is a method that converts all the letters in a string to upper case, and
+            that V is a method that returns true only if a string consists of one letter followed
+            by one digit.  Then:
+            
+            new Formula("x2+y3", N, V) should succeed
+            new Formula("x+y3", N, V) should throw an exception, since V(N("x")) is false
+            new Formula("2x+y3", N, V) should throw an exception, since "2x+y3" is syntactically incorrect.
+            </summary>
+        </member>
+        <member name="M:SS.FormulaChecker.variableChecker(System.String)">
+            <summary>
+            Determines whether or not s is a valid variable.
+            </summary>
+            <param name="s"> The variable name </param>
+            <returns> Whether or not s is valid </returns>
+        </member>
+        <member name="M:SS.FormulaChecker.GetTokens(System.String)">
+            <summary>
+            Given an expression, enumerates the tokens that compose it.  Tokens are left paren;
+            right paren; one of the four operator symbols; a string consisting of a letter or underscore
+            followed by zero or more letters, digits, or underscores; a double literal; and anything that doesn't
+            match one of those patterns.  There are no empty tokens, and no token contains white space.
+            </summary>
+        </member>
+        <member name="T:SS.FormulaFormatException">
+            <summary>
+            Used to report syntactic errors in the argument to the Formula constructor.
+            </summary>
+        </member>
+        <member name="M:SS.FormulaFormatException.#ctor(System.String)">
+            <summary>
+            Constructs a FormulaFormatException containing the explanatory message.
+            </summary>
+        </member>
+        <member name="T:SS.Spreadsheet">
+            <summary>
+            A class that represents a Spreadsheet object, containing an infinite number of cells.
+            Implements the abstract methods in AbstractSpreadsheet, which is extended by Spreadsheet.
+            </summary>
+        </member>
+        <member name="M:SS.Spreadsheet.#ctor">
+            <summary>
+            An empty constructor that assumes all variables are valid as long as they consist of one or more letters followed by
+            one or more digits.
+            </summary>
+        </member>
+        <member name="M:SS.Spreadsheet.#ctor(System.Func{System.String,System.Boolean},System.Func{System.String,System.String})">
+            <summary>
+            A constructor that allows the user to input a validator and normalizer.
+            </summary>
+            <param name="isValid">validator function</param>
+            <param name="normalize">normalizer function</param>
+        </member>
+        <member name="M:SS.Spreadsheet.GetCellContents(System.String)">
+            <summary>
+            If name is null or invalid, throws an InvalidNameException.
+            
+            Otherwise, returns the contents (as opposed to the value) of the named cell.  The return
+            value should be either a string, a double, or a Formula.
+            </summary>
+        </member>
+        <member name="M:SS.Spreadsheet.GetCellValue(System.String)">
+            <summary>
+            If name is null or invalid, throws an InvalidNameException.
+            
+            Otherwise, returns the value (as opposed to the contents) of the named cell.  The return
+            value should be either a string, a double, or a SpreadsheetUtilities.FormulaError.
+            </summary>
+        </member>
+        <member name="M:SS.Spreadsheet.SetContentsOfCell(System.String,System.String)">
+            <summary>
+            If content is null, throws an ArgumentNullException.
+            
+            Otherwise, if name is null or invalid, throws an InvalidNameException.
+            
+            Otherwise, if content parses as a double, the contents of the named
+            cell becomes that double.
+            
+            Otherwise, if content begins with the character '=', an attempt is made
+            to parse the remainder of content into a Formula f using the Formula
+            constructor.  There are then three possibilities:
+            
+              (1) If the remainder of content cannot be parsed into a Formula, a 
+                  SpreadsheetUtilities.FormulaFormatException is thrown.
+                  
+              (2) Otherwise, if changing the contents of the named cell to be f
+                  would cause a circular dependency, a CircularException is thrown.
+                  
+              (3) Otherwise, the contents of the named cell becomes f.
+            
+            Otherwise, the contents of the named cell becomes content.
+            
+            If an exception is not thrown, the method returns a set consisting of
+            name plus the names of all other cells whose value depends, directly
+            or indirectly, on the named cell.
+            
+            For example, if name is A1, B1 contains A1*2, and C1 contains B1+A1, the
+            set {A1, B1, C1} is returned.
+            </summary>
+        </member>
+        <member name="M:SS.Spreadsheet.validateName(System.String)">
+            <summary>
+            Validates a cell name
+            </summary>
+            <param name="s">The name of the cell</param>
+            <returns>Whether or not the cell name is valid</returns>
+        </member>
+        <member name="M:SS.Spreadsheet.MessageSent(System.IAsyncResult)">
+            <summary>
+            If the receive is successful, this method is called.
+            </summary>
+            <param name="result"></param>
+        </member>
+        <member name="M:SS.Spreadsheet.MessageReceived(System.IAsyncResult)">
+            <summary>
+            The callback function that comes back after an attempt to receive bytes from the socket
+            </summary>
+            <param name="result">The result of the attempted receive</param>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,216 @@
+﻿// Skeleton written by Joe Zachary for CS 3500, September 2013
+// Implemented by Kyle Pierson (u0632972)
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace SpreadsheetUtilities
+{
+    /// <summary>
+    /// Represents formulas written in standard infix notation using standard precedence
+    /// rules.  The allowed symbols are non-negative numbers written using double-precision 
+    /// floating-point syntax; variables that consist of a letter or underscore followed by 
+    /// zero or more letters, underscores, or digits; parentheses; and the four operator 
+    /// symbols +, -, *, and /.
+    /// 
+    /// Spaces are significant only insofar that they delimit tokens.  For example, "xy" is
+    /// a single variable, "x y" consists of two variables "x" and y; "x23" is a single variable; 
+    /// and "x 23" consists of a variable "x" and a number "23".
+    /// 
+    /// Associated with every formula are two delegates:  a normalizer and a validator.  The
+    /// normalizer is used to convert variables into a canonical form, and the validator is used
+    /// to add extra restrictions on the validity of a variable (beyond the standard requirement 
+    /// that it consist of a letter or underscore followed by zero or more letters, underscores,
+    /// or digits.)  Their use is described in detail in the constructor and method comments.
+    /// </summary>
+    public static class Formula
+    {
+        /// <summary>
+        /// Creates a Formula from a string that consists of an infix expression written as
+        /// described in the class comment.  If the expression is syntactically incorrect,
+        /// throws a FormulaFormatException with an explanatory Message.
+        /// 
+        /// The associated normalizer and validator are the second and third parameters,
+        /// respectively.  
+        /// 
+        /// If the formula contains a variable v such that normalize(v) is not a legal variable, 
+        /// throws a FormulaFormatException with an explanatory message. 
+        /// 
+        /// If the formula contains a variable v such that isValid(normalize(v)) is false,
+        /// throws a FormulaFormatException with an explanatory message.
+        /// 
+        /// Suppose that N is a method that converts all the letters in a string to upper case, and
+        /// that V is a method that returns true only if a string consists of one letter followed
+        /// by one digit.  Then:
+        /// 
+        /// new Formula("x2+y3", N, V) should succeed
+        /// new Formula("x+y3", N, V) should throw an exception, since V(N("x")) is false
+        /// new Formula("2x+y3", N, V) should throw an exception, since "2x+y3" is syntactically incorrect.
+        /// </summary>
+        public static void check(String formula, Func<string, string> normalize, Func<string, bool> isValid)
+        {
+            // Keep a list of all valid tokens
+            List<string> validTokens = new List<string>();
+            int expectedCategory = 1;
+            int openingParen = 0;
+            int closingParen = 0;
+
+            // Loop through all of the tokens in the expression
+            foreach (string s in GetTokens(formula))
+            {
+                // Case 1: the token is a double
+                double i;
+                if (Double.TryParse(s, out i))
+                {
+                    String sNew = i.ToString();
+
+                    // The expectedCategory variable keeps track of which tokens are allowed to follow other tokens
+                    if (expectedCategory == 1)
+                    {
+                        // Now expecting something from category 2
+                        validTokens.Add(sNew);
+                        expectedCategory = 2;
+                    }
+                    else
+                        throw new FormulaFormatException("The formula contains an incorrectly placed number, place number at the beginning or after an opening parenthesis or operator");
+                }
+
+                // Case 2: the token is an arithmetic operator
+                else if ((s == "+" || s == "-" || s == "*" || s == "/"))
+                {
+                    if (expectedCategory == 2)
+                    {
+                        // Now expecting something from category 1
+                        expectedCategory = 1;
+                    }
+
+                    else
+                        throw new FormulaFormatException("The formula contains an incorrectly placed operator, place operator after a number, variable, or closing parenthesis");
+                }
+
+                // Case 3: the token is an opening parenthesis
+                else if ((s == "("))
+                {
+                    openingParen++;
+                    if (expectedCategory == 1)
+                    {
+                        // Now expecting something from category 1
+                        expectedCategory = 1;
+                    }
+
+                    else
+                        throw new FormulaFormatException("The formula contains an incorrectly placed opening parenthesis, place opening parenthesis at the beginning or after an operator or opening parenthesis");
+                }
+
+                // Case 4: the token is a closing parenthesis
+                else if ((s == ")"))
+                {
+                    closingParen++;
+                    if (expectedCategory == 2 && closingParen <= openingParen)
+                    {
+                        // Now expecting something from category 2
+                        expectedCategory = 2;
+                    }
+
+                    else
+                        throw new FormulaFormatException("The formula contains an incorrectly placed closing parenthesis, place closing parenthesis after a number or variable");
+                }
+
+                // Case 5: the token is a valid variable
+                else if (variableChecker(s))
+                {
+                    String sNew = normalize(s);
+                    if (!(isValid(sNew)))
+                        throw new FormulaFormatException("The formula contains an invalid variable, enter a valid variable");
+
+                    if (expectedCategory == 1)
+                    {
+                        // Now expecting something from category 2
+                        validTokens.Add(sNew);
+                        expectedCategory = 2;
+                    }
+
+                    else
+                        throw new FormulaFormatException("The formula contains an incorrectly placed variable, place variables at the beginning or after operators or opening parentheses");
+                }
+
+                // Case 6: the token is illegal
+                else
+                    throw new FormulaFormatException("The formula contains an illegal token, use only numbers, variables, operators, or parentheses");
+            }
+
+            // These if statements verify that there are an equal number of opening and closing parentheses,
+            // that the formula ends on a valid token, and that the formula contains at least one token.
+            if (validTokens.Count == 0)
+                throw new FormulaFormatException("The formula contains no tokens, enter at least one token");
+
+            if (openingParen != closingParen)
+                throw new FormulaFormatException("There are an unequal number of parentheses, enter an equal number of parentheses");
+
+            if (expectedCategory != 2)
+                throw new FormulaFormatException("The formula ends in an invalid token, formula can end in a number, variable, or closing parenthesis");
+        }
+
+
+        /// <summary>
+        /// Determines whether or not s is a valid variable.
+        /// </summary>
+        /// <param name="s"> The variable name </param>
+        /// <returns> Whether or not s is valid </returns>
+        private static Boolean variableChecker(String s)
+        {
+            if (ReferenceEquals(s, null))
+                return false;
+
+            return Regex.IsMatch(s, @"^[a-zA-Z]+[0-9]+$");
+        }
+
+
+        /// <summary>
+        /// Given an expression, enumerates the tokens that compose it.  Tokens are left paren;
+        /// right paren; one of the four operator symbols; a string consisting of a letter or underscore
+        /// followed by zero or more letters, digits, or underscores; a double literal; and anything that doesn't
+        /// match one of those patterns.  There are no empty tokens, and no token contains white space.
+        /// </summary>
+        private static IEnumerable<string> GetTokens(String formula)
+        {
+            // Patterns for individual tokens
+            String lpPattern = @"\(";
+            String rpPattern = @"\)";
+            String opPattern = @"[\+\-*/]";
+            String varPattern = @"[a-zA-Z_](?: [a-zA-Z_]|\d)*";
+            String doublePattern = @"(?: \d+\.\d* | \d*\.\d+ | \d+ ) (?: [eE][\+-]?\d+)?";
+            String spacePattern = @"\s+";
+
+            // Overall pattern
+            String pattern = String.Format("({0}) | ({1}) | ({2}) | ({3}) | ({4}) | ({5})",
+                                            lpPattern, rpPattern, opPattern, varPattern, doublePattern, spacePattern);
+
+            // Enumerate matching tokens that don't consist solely of white space.
+            foreach (String s in Regex.Split(formula, pattern, RegexOptions.IgnorePatternWhitespace))
+            {
+                if (!Regex.IsMatch(s, @"^\s*$", RegexOptions.Singleline))
+                {
+                    yield return s;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Used to report syntactic errors in the argument to the Formula constructor.
+    /// </summary>
+    public class FormulaFormatException : Exception
+    {
+        /// <summary>
+        /// Constructs a FormulaFormatException containing the explanatory message.
+        /// </summary>
+        public FormulaFormatException(String message)
+            : base(message)
+        {
+        }
+    }
+}

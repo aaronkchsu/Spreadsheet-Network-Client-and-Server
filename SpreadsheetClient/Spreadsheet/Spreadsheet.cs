@@ -1,0 +1,293 @@
+﻿// Implemented by Kyle Pierson (u0632972) October 2014
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml;
+using System.Text.RegularExpressions;
+using System.Net.Sockets;
+
+namespace SS
+{
+    /// <summary>
+    /// A class that represents a Spreadsheet object, containing an infinite number of cells.
+    /// Implements the abstract methods in AbstractSpreadsheet, which is extended by Spreadsheet.
+    /// </summary>
+    public class Spreadsheet : AbstractSpreadsheet
+    {
+        // A dictionary to associate names with cell objects
+        private Dictionary<string, Cell> namedCells;
+        private TcpClient spreadClient;
+        private Socket spreadSocket;
+        private string ipAddress = "lab1-18.eng.utah.edu";
+        private int port = 2119;
+
+        public event Action<String, String> CellReceived; // Event for when "cell ..." is received
+
+        /// <summary>
+        /// An empty constructor that assumes all variables are valid as long as they consist of one or more letters followed by
+        /// one or more digits.
+        /// </summary>
+        public Spreadsheet()
+            : base(s => true, s => s)
+        {
+            namedCells = new Dictionary<string, Cell>();
+            spreadClient = new TcpClient(ipAddress, port);
+            spreadSocket = spreadClient.Client;
+
+            String message = "connect sysadmin newspreadsheet\n";
+            byte[] buffer = System.Text.Encoding.ASCII.GetBytes(message);
+            spreadSocket.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, MessageSent, buffer);
+
+            byte[] recBytes = new byte[1024];
+
+            // Start receiving data from the socket
+            spreadSocket.BeginReceive(recBytes, 0, recBytes.Length, SocketFlags.None, MessageReceived, recBytes);
+        }
+
+
+        /// <summary>
+        /// A constructor that allows the user to input a validator and normalizer.
+        /// </summary>
+        /// <param name="isValid">validator function</param>
+        /// <param name="normalize">normalizer function</param>
+        public Spreadsheet(Func<string, bool> isValid, Func<string, string> normalize)
+            : base(isValid, normalize)
+        {
+            namedCells = new Dictionary<string, Cell>();
+            spreadClient = new TcpClient(ipAddress, port);
+            spreadSocket = spreadClient.Client;
+
+            String message = "connect sysadmin newspreadsheet\n";
+            byte[] buffer = System.Text.Encoding.ASCII.GetBytes(message);
+            spreadSocket.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, MessageSent, buffer);
+
+            byte[] recBytes = new byte[1024];
+
+            // Start receiving data from the socket
+            spreadSocket.BeginReceive(recBytes, 0, recBytes.Length, SocketFlags.None, MessageReceived, recBytes);
+        }
+
+
+        /// <summary>
+        /// If name is null or invalid, throws an InvalidNameException.
+        /// 
+        /// Otherwise, returns the contents (as opposed to the value) of the named cell.  The return
+        /// value should be either a string, a double, or a Formula.
+        /// </summary>
+        public override String GetCellContents(String name)
+        {
+            // Check for a valid cell name
+            if (!(validateName(name) && IsValid(name)))
+                throw new InvalidNameException();
+
+            name = Normalize(name);
+            Cell c = new Cell();
+
+            if (namedCells.ContainsKey(name))
+                c = namedCells[name];
+
+            // Return the current contents of the cell
+            return c.getContents();
+        }
+
+
+        // ADDED FOR PS5
+        /// <summary>
+        /// If name is null or invalid, throws an InvalidNameException.
+        /// 
+        /// Otherwise, returns the value (as opposed to the contents) of the named cell.  The return
+        /// value should be either a string, a double, or a SpreadsheetUtilities.FormulaError.
+        /// </summary>
+        public override String GetCellValue(string name)
+        {
+            // Check for a valid cell name
+            if (!(validateName(name) && IsValid(name)))
+                throw new InvalidNameException();
+
+            name = Normalize(name);
+            Cell c = new Cell();
+
+            if (namedCells.ContainsKey(name))
+                c = namedCells[name];
+
+            // Return the current contents of the cell
+            return c.getValue();
+        }
+
+
+        // ADDED FOR PS5
+        /// <summary>
+        /// If content is null, throws an ArgumentNullException.
+        /// 
+        /// Otherwise, if name is null or invalid, throws an InvalidNameException.
+        /// 
+        /// Otherwise, if content parses as a double, the contents of the named
+        /// cell becomes that double.
+        /// 
+        /// Otherwise, if content begins with the character '=', an attempt is made
+        /// to parse the remainder of content into a Formula f using the Formula
+        /// constructor.  There are then three possibilities:
+        /// 
+        ///   (1) If the remainder of content cannot be parsed into a Formula, a 
+        ///       SpreadsheetUtilities.FormulaFormatException is thrown.
+        ///       
+        ///   (2) Otherwise, if changing the contents of the named cell to be f
+        ///       would cause a circular dependency, a CircularException is thrown.
+        ///       
+        ///   (3) Otherwise, the contents of the named cell becomes f.
+        /// 
+        /// Otherwise, the contents of the named cell becomes content.
+        /// 
+        /// If an exception is not thrown, the method returns a set consisting of
+        /// name plus the names of all other cells whose value depends, directly
+        /// or indirectly, on the named cell.
+        /// 
+        /// For example, if name is A1, B1 contains A1*2, and C1 contains B1+A1, the
+        /// set {A1, B1, C1} is returned.
+        /// </summary>
+        public override void SetContentsOfCell(string name, string content)
+        {
+            // Validate content and name
+            if (content == null)
+                throw new ArgumentNullException();
+
+            // Check for a valid cell name
+            if (!(validateName(name) && IsValid(name)))
+                throw new InvalidNameException();
+
+            name = Normalize(name);
+
+            if (content.StartsWith("="))
+            {
+                FormulaChecker.check(content.Substring(1), Normalize, IsValid);
+            }
+
+            String message = "cell " + name + " " + content + "\n";
+            byte[] buffer = System.Text.Encoding.ASCII.GetBytes(message);
+            spreadSocket.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, MessageSent, buffer);
+
+            byte[] recBytes = new byte[1024];
+
+            // Start receiving data from the socket
+            spreadSocket.BeginReceive(recBytes, 0, recBytes.Length, SocketFlags.None, MessageReceived, recBytes);
+        }
+
+
+        /// <summary>
+        /// Validates a cell name
+        /// </summary>
+        /// <param name="s">The name of the cell</param>
+        /// <returns>Whether or not the cell name is valid</returns>
+        private Boolean validateName(String s)
+        {
+            if (s == null)
+                return false;
+
+            // Checks to see if the first character is valid
+            return Regex.IsMatch(s, @"^[a-zA-Z]+[0-9]+$");
+        }
+
+
+        /// <summary>
+        /// If the receive is successful, this method is called.
+        /// </summary>
+        /// <param name="result"></param>
+        private void MessageSent(IAsyncResult result)
+        {
+            byte[] item = (byte[])result.AsyncState;
+            Console.WriteLine("Message Sent");
+        }
+
+        /// <summary>
+        /// The callback function that comes back after an attempt to receive bytes from the socket
+        /// </summary>
+        /// <param name="result">The result of the attempted receive</param>
+        private void MessageReceived(IAsyncResult result)
+        {
+            // Get the state object from 'result'
+            byte[] recBytes = (byte[])(result.AsyncState);
+
+            // Get the amount of bytes received
+            int bytes = spreadSocket.EndReceive(result);
+
+            // Convert the received bytes into a string and append it onto 'incoming'
+            String incoming = System.Text.Encoding.ASCII.GetString(recBytes, 0, bytes);
+
+            String[] commands = incoming.Split('\n');
+
+            foreach (String command in commands)
+            {
+                if (command.StartsWith("cell"))
+                {
+                    Console.WriteLine(command);
+
+                    String[] tokens = command.Split(' ');
+                    String name = tokens[1];
+                    String content = tokens[2];
+                    String value = content;
+
+                    Cell c = new Cell();
+
+                    if(content.StartsWith("="))
+                    {
+                        Formula f = new Formula(content.Substring(1), Normalize, IsValid);
+                        try
+                        {
+                            value = f.Evaluate(Lookup).ToString();
+                        }
+                        catch(Exception)
+                        {
+                            value = "Formula Error";
+                        }
+                    }
+
+                    // If the cell already contains contents, reset the contents
+                    if (namedCells.ContainsKey(name))
+                    {
+                        namedCells[name].setContents(content, value);
+                    }
+                    else
+                    {
+                        c.setContents(content, value);
+                        namedCells.Add(name, c);
+                    }
+
+                    // If the new content is nothing, remove the name from our dictionary
+                    if (content == "")
+                        namedCells.Remove(name);
+
+                    CellReceived(name, content);
+                }
+                else if (command.StartsWith("connected"))
+                {
+                    // Parse number of cells coming in, execute those commands
+                }
+                else if(command.StartsWith("error"))
+                {
+                    // Handle error (Display?)
+                }
+                else
+                {
+                    // Ignore?
+                }
+            }
+
+            recBytes = new byte[1024];
+
+            // Start receiving data from the socket
+            spreadSocket.BeginReceive(recBytes, 0, recBytes.Length, SocketFlags.None, MessageReceived, recBytes);
+        }
+
+        private double Lookup(String variable)
+        {
+            double d;
+            if (!Double.TryParse(namedCells[variable].getValue(), out d))
+                throw new FormulaFormatException("Dependent cell not of type double");
+            
+            return d;
+        }
+    }
+}

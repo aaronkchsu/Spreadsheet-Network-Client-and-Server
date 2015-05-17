@@ -1,0 +1,13 @@
+C:\Users\Kyle\Documents\Visual Studio 2013\Projects\SpreadsheetClient\Spreadsheet\bin\Debug\Spreadsheet.XML
+C:\Users\Kyle\Documents\Visual Studio 2013\Projects\SpreadsheetClient\Spreadsheet\bin\Debug\Spreadsheet.dll
+C:\Users\Kyle\Documents\Visual Studio 2013\Projects\SpreadsheetClient\Spreadsheet\bin\Debug\Spreadsheet.pdb
+C:\Users\Kyle\Documents\Visual Studio 2013\Projects\SpreadsheetClient\Spreadsheet\obj\Debug\Spreadsheet.csprojResolveAssemblyReference.cache
+C:\Users\Kyle\Documents\Visual Studio 2013\Projects\SpreadsheetClient\Spreadsheet\obj\Debug\Spreadsheet.dll
+C:\Users\Kyle\Documents\Visual Studio 2013\Projects\SpreadsheetClient\Spreadsheet\obj\Debug\Spreadsheet.pdb
+C:\Users\Kyle\Documents\Visual Studio 2013\Projects\SpreadsheetClient\Spreadsheet\bin\Debug\Formula.dll
+C:\Users\Kc\Desktop\SpreadsheetClient\Spreadsheet\bin\Debug\Spreadsheet.XML
+C:\Users\Kc\Desktop\SpreadsheetClient\Spreadsheet\bin\Debug\Spreadsheet.dll
+C:\Users\Kc\Desktop\SpreadsheetClient\Spreadsheet\bin\Debug\Spreadsheet.pdb
+C:\Users\Kc\Desktop\SpreadsheetClient\Spreadsheet\bin\Debug\Formula.dll
+C:\Users\Kc\Desktop\SpreadsheetClient\Spreadsheet\obj\Debug\Spreadsheet.dll
+C:\Users\Kc\Desktop\SpreadsheetClient\Spreadsheet\obj\Debug\Spreadsheet.pdb
